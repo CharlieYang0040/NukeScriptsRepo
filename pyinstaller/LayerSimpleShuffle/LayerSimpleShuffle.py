@@ -155,5 +155,3 @@ def shuffle_layers():
             merge_node.setXYpos(first_shuffle_node.xpos(), first_shuffle_node.ypos() + 300)
 
     nuke.message("Layers shuffled into individual Shuffle2 nodes.")
-
-shuffle_layers()
