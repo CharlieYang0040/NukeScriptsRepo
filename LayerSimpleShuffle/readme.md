@@ -17,7 +17,7 @@ SimpleShuffle 플러그인은 Nuke 사용자가 합성 작업에서 다양한 �
 
 ### 간편 설치
 
-1. GitHub 릴리즈 페이지에서 `SimpleShuffle_Install.exe` 파일을 [다운로드](https://github.com/CharlieYang0040/NukeScriptsRepo/releases/download/v0.1.0/SimpleShuffle_Install.exe)합니다. 
+1. GitHub 릴리즈 페이지에서 `SimpleShuffle_Install.exe` 파일을 [다운로드](https://github.com/CharlieYang0040/NukeScriptsRepo/releases)합니다. 
 2. 다운로드한 파일을 실행하여 설치를 완료합니다.
 
 ### 또는 매뉴얼 설치
