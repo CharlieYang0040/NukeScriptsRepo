@@ -4,8 +4,7 @@
 
 SimpleShuffle 플러그인은 Nuke 사용자가 합성 작업에서 다양한 채널 패스를 분류하고 셔플링하는 과정을 도와줍니다. 이 도구는 채널을 자동으로 분류하여 메인 패스, 엑스트라 패스, AOV 패스, 라이트 패스 및 기타 패스로 나누어 관리하는 작업을 단순화합니다.
 
-![image](https://github.com/CharlieYang0040/NukeScriptsRepo/assets/129147417/1c050f3c-6f99-49ba-9654-2aefe522157e)
-
+![image](https://github.com/CharlieYang0040/NukeScriptsRepo/assets/129147417/f72a6160-aa39-45df-9799-fd46d981a342)
 
 
 ## 주요 기능
