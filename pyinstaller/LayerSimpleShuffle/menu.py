@@ -1,5 +1,6 @@
 import nuke
 import LayerSimpleShuffle
 
-ChannelMenu = nuke.menu('Nodes').menu('Channel')
-ChannelMenu.addCommand('LayerSimpleShuffle', 'LayerSimpleShuffle.shuffle_layers()', 'ctrl+r')
+shuffle_tool = LayerSimpleShuffle.NukeShuffleTool()
+ChannelMenu = nuke.menu('Nuke')
+ChannelMenu.addCommand('Plugins/LayerSimpleShuffle', lambda: shuffle_tool.startShuffle(), 'ctrl+r')
