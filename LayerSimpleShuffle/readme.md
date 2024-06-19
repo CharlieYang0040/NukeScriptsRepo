@@ -20,13 +20,13 @@ SimpleShuffle 플러그인은 Nuke 사용자가 합성 작업에서 다양한 �
 1. GitHub 릴리즈 페이지에서 `SimpleShuffle_Install.exe` 파일을 [다운로드](https://github.com/CharlieYang0040/NukeScriptsRepo/releases/download/v0.1.0/SimpleShuffle_Install.exe)합니다. 
 2. 다운로드한 파일을 실행하여 설치를 완료합니다.
 
-### 매뉴얼 설치
+### 또는 매뉴얼 설치
 
 1. GitHub 리포지토리 [NukeScriptsRepo](https://github.com/CharlieYang0040/NukeScriptsRepo)에서 `LayerSimpleShuffle` 폴더를 다운로드합니다.
-2. 다운로드한 폴더를 Nuke 플러그인 디렉토리에 위치시킵니다.
-3. `init.py` 또는 `menu.py` 파일에 다음 줄을 추가하여 시작 시 플러그인이 로드되도록 합니다:
+2. 다운로드한 폴더를 Nuke 플러그인 디렉토리에 위치시킵니다. (C:\Users\사용자이름\.nuke)
+3. `init.py` 파일에 다음 줄을 추가하여 시작 시 플러그인이 로드되도록 합니다:
     ```python
-    nuke.pluginAddPath('path/to/your/plugins/directory')
+    nuke.pluginAddPath('./LayerSimpleShuffle')
     ```
 
 ## 사용 방법
@@ -38,6 +38,10 @@ SimpleShuffle 플러그인은 Nuke 사용자가 합성 작업에서 다양한 �
 ## 커스터마이징
 
 `LayerSimpleShuffle.py` 스크립트의 관련 섹션을 편집하여 패스 이름을 사용자 지정할 수 있습니다. 메인 패스 이름, 엑스트라 패스 이름 및 기타 분류 항목을 자신의 합성 요구에 맞게 조정할 수 있습니다.
+
+## 버전
+
+v0.2.0 : 비상업용(Non-commercial) 버전 Nuke에서 "10 nodes python scripts limits"에 의해 작동이 안되는 문제를 수정하였습니다.
 
 ## 라이선스
 
