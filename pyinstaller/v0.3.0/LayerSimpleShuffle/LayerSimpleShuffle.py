@@ -2,17 +2,25 @@ import nuke
 import nukescripts
 
 def get_channel_passes(node):
+    # Predefined categories with exact keyword matching
     pass_categories = {
         "main_pass": ["lighting", "GI", "reflect", "refract", "specular", "SSS", "Self_Illumination", "selfIllum", "caustics", "atmosphere", "background"],
         "extra_pass": ["coat_filter", "coat_reflection", "coat_specular", "sheen_filter", "sheen_reflection", "sheen_specular", "Toon", "toonLighting", "toonSpecular"],
         "aov_pass": ["depth", "cryptomatte", "cryptomatte00", "cryptomatte01", "cryptomatte02", "bumpNormals", "coatGloss", "coverage", "custom_color", "DR", "diffuse", "extraTex", "LightingAnalysis", "materialID", "materialSelect", "matteShadow", "metalness", "multimatte", "multimatteID", "noise_level", "normals", "objectId", "objectSelect", "reflIOR", "reflGloss", "refrGloss", "renderId", "render_time", "sampleRate", "samplerInfo", "shadow", "sheenGloss", "totalLight", "unclampedColor", "VRScansPaintMask", "VRScansZoneMask", "velocity", "zDepth", "albedo"],
         "light_pass": ["Light", "VRay", "LGT", "light", "key", "fill", "rim", "top"]
     }
+    
+    # Categories for case-insensitive keyword matching
+    case_insensitive_categories = {
+        "extra_pass": ["raw", "Filter"],
+        "light_pass": ["Light", "VRay", "LGT", "key", "fill", "rim", "top"]
+    }
+    
     categories = {k: [] for k in pass_categories.keys()}
     etc_pass = []
 
     channels = list(set(channel.split('.')[0] for channel in node.channels()))
-    channels = [channel for channel in channels if channel not in ["rgba", "alpha"]]
+    channels = [channel for channel in channels if channel not in ["rgba", "rgb", "alpha"]]
 
     for channel in channels:
         added = False
@@ -21,6 +29,15 @@ def get_channel_passes(node):
                 categories[category].append(channel)
                 added = True
                 break
+        
+        if not added:
+            # Check for case-insensitive matching if not added yet
+            for category, names in case_insensitive_categories.items():
+                if any(name.lower() in channel.lower() for name in names):
+                    categories[category].append(channel)
+                    added = True
+                    break
+        
         if not added:
             etc_pass.append(channel)
     
