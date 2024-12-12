@@ -27,12 +27,11 @@ import nuke
 
 
 class NukeToPack:
-    def __init__(self, use_relative_path=False):
+    def __init__(self):
         script_dir = os.path.dirname(__file__)
         profile = joinpath(script_dir, 'profile.ini')
         nuke_file = nuke.Root().name()
         self.source_dir = os.path.dirname(nuke_file)
-        self.use_relative_path = use_relative_path  # 상대경로 사용 여부
         if os.path.exists(profile):
             cf = configparser.ConfigParser()
             cf.read(profile, encoding='utf-8')
@@ -166,7 +165,7 @@ class NukeToPack:
                     
                     nuke.message("패키징이 완료되었습니다!")
                 except Exception as e:
-                    nuke.message(f"완료 작업 중 오�� 발생: {str(e)}")
+                    nuke.message(f"완료 작업 중 오류 발생: {str(e)}")
 
             # 메인 스레드에서 실행
             nuke.executeInMainThread(finish_tasks)
@@ -182,45 +181,6 @@ class NukeToPack:
                     self.task.setProgress(100)
                     self.task = None
             nuke.executeInMainThread(cleanup)
-
-    def _update_node(self, n, new_dir, filename):
-        """
-        노드의 파일 경로를 업데이트하는 통합 메서드
-        
-        Args:
-            n: 업데이트할 Nuke 노드
-            new_dir: 새로운 디렉토리 경로
-            filename: 파일 이름 (base_name)
-        """
-        if self.use_relative_path:
-            script_dir = os.path.dirname(nuke.Root().name())
-            print(f"[DEBUG] 스크립트 디렉토리: {script_dir}")
-            
-            full_path = f"{new_dir}/{filename}"
-            print(f"[DEBUG] 대상 파일 전체 경로: {full_path}")
-            
-            try:
-                rel_path = os.path.relpath(full_path, script_dir)
-                print(f"[DEBUG] 계산된 상대 경로 (변환 전): {rel_path}")
-                
-                clean_path = rel_path.replace('\\', '/')
-                print(f"[DEBUG] 최종 정리된 경로: {clean_path}")
-                
-                print(f"[DEBUG] 노드 이름: {n.name()}")
-                print(f"[DEBUG] 이전 파일 경로: {n['file'].getValue()}")
-                
-                n['file'].setValue(clean_path)
-                print(f"[DEBUG] 새로운 파일 경로로 업데이트 완료: {clean_path}")
-            except Exception as e:
-                print(f"[ERROR] 상대 경로 계산 중 오류 발생: {str(e)}")
-        else:
-            if new_dir.startswith('//'):
-                clean_dir = '//' + new_dir.lstrip('/').rstrip('/')
-            else:
-                clean_dir = new_dir.rstrip('/')
-            clean_path = f"{clean_dir}/{filename}"
-            n['file'].setValue(clean_path)
-            print(f"노드 경로 업데이트: {clean_path}")
 
     def _copy_single_file(self, file_, pack_dir, n):
         file_ = file_.replace('\\', '/')
@@ -241,7 +201,18 @@ class NukeToPack:
             try:
                 shutil.copy2(old_file, new_dir)
                 print(f"[성공] 파일 복사 완료: {old_file} -> {new_dir}")
-                nuke.executeInMainThread(lambda: self._update_node(n, new_dir, file_name))
+                # 노드 경로 업데이트는 메인 스레드에서 실행
+                def update_node():
+                    # 네트워크 경로 처리
+                    if new_dir.startswith('//'):
+                        # 네트워크 경로의 시작 // 보존
+                        clean_dir = '//' + new_dir.lstrip('/').rstrip('/')
+                    else:
+                        clean_dir = new_dir.rstrip('/')
+                    clean_path = f"{clean_dir}/{file_name}"
+                    n['file'].setValue(clean_path)
+                    print(f"노드 경로 업데이트: {clean_path}")
+                nuke.executeInMainThread(update_node)
             except Exception as e:
                 print(f"[오류] 파일 복사 실패: {e}")
                 raise
@@ -269,7 +240,19 @@ class NukeToPack:
             except Exception as e:
                 print(f"[오류] 파일 복사 실패: {e}")
                 continue
-        nuke.executeInMainThread(lambda: self._update_node(n, new_dir, base_name))
+        
+        # 노드 경로 업데이트는 메인 스레드에서 실행
+        def update_node():
+            # 네트워크 경로 처리
+            if new_dir.startswith('//'):
+                # 네트워크 경로의 시작 // 보존
+                clean_dir = '//' + new_dir.lstrip('/').rstrip('/')
+            else:
+                clean_dir = new_dir.rstrip('/')
+            clean_path = f"{clean_dir}/{base_name}"
+            n['file'].setValue(clean_path)
+            print(f"노드 경로 업데이트: {clean_path}")
+        nuke.executeInMainThread(update_node)
 
     def run_to_pack(self):
         # 별도의 스레드에서 실행
@@ -277,7 +260,5 @@ class NukeToPack:
 
 
 def run():
-    # 사용자에게 경로 타입 선택 요청
-    result = nuke.ask('상대 경로를 사용하시겠습니까?\n\nYes: 상대 경로\nNo: 절대 경로')
-    r = NukeToPack(use_relative_path=result)
-    r.run_to_pack()
+    r = NukeToPack()
+    r.run_to_pack()  # 스레드로 실행
