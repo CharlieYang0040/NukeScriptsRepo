@@ -1,0 +1,180 @@
+완벽해요 — 배포(다른 아티스트/스튜디오 머신에 설치하기)가 쉬운 형태로 시작하겠습니다.
+먼저 **개발 전 설계(파이썬 환경·외부 의존성 구성 방식 + 전체 프로젝트 구조)**를 확실하게 정리한 뒤, 그 구조에 맞춰 코드를 작성하는 방식으로 진행할게요. 아래는 실무에서 배포·유지보수·디버깅이 쉽도록 설계한 권장안입니다.
+
+---
+
+# 핵심 요약 (한 문장)
+
+플러그인은 `~/.nuke`(또는 전사 플러그인 경로)에 설치 가능한 **패키지 폴더** 형태로 배포하고, Nuke가 번들로 제공하는 Python 인터프리터(또는 해당 버전과 ABI에 맞춘 wheel)를 사용해 필요한 외부 패키지를 설치/번들링하여, `init.py`/`menu.py`로 자동 로드·단축키 연결·업데이트가 가능한 형태로 제공합니다. (Nuke의 시작 스크립트 규칙/플러그인 경로는 Foundry 문서 참조). ([Foundry Support][1])
+
+---
+
+# 1) Nuke의 Python + 외부 의존성 — 운영 원칙과 옵션
+
+### A. Nuke의 Python 환경 이해 (원칙)
+
+* Nuke는 자체 번들 Python 인터프리터(버전은 Nuke 버전에 따라 다름)를 사용합니다. (예: Nuke 16/17 시리즈는 Python 3 계열; 최근 Nuke 16+ 문서 참고). Foundry는 “Nuke가 제공하는 Python 인터프리터를 사용하는 것이 공식 지원 방식”이라고 명시합니다. ([Foundry Learn][2])
+* Nuke는 시작 시 `init.py`와 `menu.py`를 플러그인 경로에서 찾아 실행합니다. 플러그인 경로는 `NUKE_PATH` 환경변수 또는 `nuke.pluginAddPath()`로 조정할 수 있습니다. ([Foundry Support][1])
+
+### B. 외부 패키지(예: Pillow, pywin32 등) 설치·배포 옵션 (장단점)
+
+1. **권장 — Nuke 번들 Python에 직접 설치 (권장·간단)**
+
+   * 방법: Nuke 설치 폴더 안의 Python 실행기로 `-m pip install ...` 실행. (예시: `"/Applications/Nuke16/Nuke16.app/Contents/Resources/Nuke/python/bin/python3.11" -m pip install pillow`)
+   * 장점: 가장 단순, Nuke 런타임에서 바로 import 가능.
+   * 단점: 각 사용자의 Nuke 설치 경로마다 설치 필요(관리자가 설치할 수도 있음). 바이너리 의존성(예: 컴파일된 C 확장)이 있으면 빌드/ABI 호환성 확인 필요. ([Stack Overflow][3])
+
+2. **벤더링(vendoring) — 플러그인에 패키지(또는 .whl) 포함**
+
+   * 방법: Pure-Python 패키지나 플랫폼별 wheel을 플러그인 폴더(예: `myplugin/libs/`)에 넣고 `sys.path.insert(0, os.path.join(PLUGIN_DIR,'libs'))`로 로드.
+   * 장점: 사용자에게 별도 pip 설치 요구하지 않음 → 즉시 사용 가능.
+   * 단점: 바이너리 패키지(예: pywin32, numpy)라면 플랫폼/파이썬ABI별로 wheel을 준비해야 함. 파일 용량 증가.
+
+3. **가상환경(venv) + point Nuke to it (덜 권장)**
+
+   * 방법: Nuke 프로세스가 다른 Python 가상환경을 쓰도록 완전히 바꾸는 건 어렵고 위험함(Foundry는 자체 Python 사용 권장). 다만, Nuke를 “Python 모듈로” import 하여 외부 Python에서 Nuke API를 쓸 수 있는 모드도 지원 — 테스트용/파이프라인용으로는 유용. ([Foundry Learn][4])
+
+4. **설치 스크립트 제공 (권장 배포 방식)**
+
+   * 각 플랫폼(Windows/macOS/Linux) 별로 `install.bat` / `install.sh` 를 준비해, (a) 필요한 wheel을 설치하거나 (b) Nuke Python으로 `pip install -r requirements.txt` 하도록 자동화. (관리자 권한 요구 여부를 설치 스크립트에서 처리)
+
+### C. 바이너리(확장 C) 의존성 처리 팁
+
+* Nuke의 Python 버전(예: 3.10 / 3.11)과 플랫폼(x64)으로 빌드된 wheel 필요.
+* 가능하면 **pure-Python(순수 Python)** 패키지만 사용하거나, Pillow처럼 널리 사용되고 이미 wheel이 배포되는 패키지 사용 권장.
+* 자체 빌드가 필요한 경우, Nuke와 동일한 OS/아키텍처/파이썬으로 빌드한 wheel을 배포해야 합니다.
+
+---
+
+# 2) 권장 전체 프로젝트 구조 (배포·개발·테스트 친화적)
+
+아래 구조는 ZIP/installer 배포와 Git 기반 개발 모두에 적합합니다.
+
+```
+nuke-clipboard-paste/                 # 루트 repo
+├── README.md
+├── LICENSE
+├── setup/                            # 설치/배포 스크립트
+│   ├── install_windows.bat
+│   ├── install_mac.sh
+│   └── uninstall.bat
+├── requirements.txt                  # 개발용(예: Pillow==9.5.0)
+├── wheels/                           # (선택) 플랫폼별 wheel 보관 (배포판에 포함시킬 경우)
+│   ├── windows/
+│   │   └── Pillow-9.5.0-cp311-win_amd64.whl
+│   └── mac/
+├── docs/
+│   ├── usage.md
+│   └── troubleshooting.md
+├── plugin/                           # 배포할 실제 Nuke 플러그인 폴더 (copy → ~/.nuke/nuke-clipboard-paste)
+│   ├── init.py                       # 시작시 로드되는 초기화 (경로 추가, 로깅 설정 등)
+│   ├── menu.py                       # 메뉴/단축키 등록 (Nuke 메뉴에 버튼 추가)
+│   ├── paste_from_clipboard.py       # 핵심 로직 (클립보드 -> 파일 -> read node 생성)
+│   ├── libs/                         # (선택) vendored pure-Python libs or wheels
+│   ├── icons/                        # 메뉴 아이콘(선택)
+│   └── resources/                    # 템플릿 파일, 기본 설정
+├── tests/
+│   └── unit_tests.py                 # (가능한 부분에 대한 유닛테스트 — 일부는 Nuke 전용 API여서 외부에서 모킹)
+└── ci/                               # CI 설치 스크립트 (회사 내부 빌드용)
+    └── build_wheels.yml
+```
+
+* `plugin/` 폴더 전체를 그대로 압축해 사용자에게 배포하면, 사용자는 `plugin/`을 `~/.nuke/nuke-clipboard-paste`로 복사(또는 `nuke.pluginAddPath()`로 경로 추가)하면 됩니다. `init.py`에서 `sys.path`에 `libs/`를 추가해 vendored 패키지 우선 로드하도록 합니다. Foundry는 `init.py`/`menu.py` 자동 실행을 권장합니다. ([Foundry Learn][5])
+
+---
+
+# 3) 설치/업데이트 시나리오(자동화된 권장 흐름)
+
+### A. 배포 패키지(권장)
+
+* 배포자는 `plugin/` 폴더 + `install` 스크립트 + (필요시) platform-specific wheels 를 ZIP으로 묶음.
+* 사용자는:
+
+  1. ZIP 해제 → `plugin/` 폴더를 `~/.nuke/nuke-clipboard-paste/`로 복사.
+  2. (Windows) `install_windows.bat` 실행 → `nuke_python -m pip install -r requirements.txt` 수행(또는 `wheels/windows/*.whl` 설치).
+  3. Nuke 재시작 → 메뉴(또는 설정한 단축키)에서 기능 사용.
+
+### B. 설치 스크립트 예시 (Windows)
+
+`install_windows.bat` (간단한 예 — Nuke 경로가 표준 설치라고 가정)
+
+```bat
+@echo off
+REM 1) copy plugin into %USERPROFILE%\.nuke
+xcopy /E /I plugin "%USERPROFILE%\.nuke\nuke-clipboard-paste"
+
+REM 2) find Nuke python interpreter (사용 환경에 맞게 경로 수정 권장)
+SET NUKE_PYTHON="%PROGRAMFILES%\Nuke16\python\python.exe"
+IF NOT EXIST %NUKE_PYTHON% (
+  echo Please adjust NUKE_PYTHON path in install_windows.bat
+  pause
+)
+
+REM 3) install requirements into Nuke python
+%NUKE_PYTHON% -m pip install --upgrade pip
+%NUKE_PYTHON% -m pip install -r requirements.txt --no-cache-dir
+
+echo Installation complete. Please restart Nuke.
+pause
+```
+
+(실제 배포에서는 Nuke 설치 경로를 레지스트리/환경변수/사용자 입력으로 찾아내는 로직을 넣는 것이 좋습니다.)
+
+### C. macOS / Linux 설치 스크립트 유사(권한·경로 차이 주의)
+
+---
+
+# 4) `init.py` / `menu.py` 동작 방식 (설치 관점)
+
+* `init.py` : 플러그인 초기화(환경 변수, `sys.path`에 `libs/` 추가, 로깅 셋업, 플러그인 버전 체크 등). Foundry 문서 권장. ([Foundry Support][6])
+* `menu.py` : Nuke UI 메뉴 항목 및 단축키 등록. 이 파일은 사용자가 메뉴에서 바로 기능을 쓰게 해주고, 업데이트 시 메뉴 변경으로 버전 표시/도움말 접근 가능. ([GitHub][7])
+
+**권장 `init.py` 동작(순서)**
+
+1. 플러그인 루트 디렉토리 찾기 ( `__file__` 기반 ).
+2. `sys.path.insert(0, os.path.join(plugin_root,'libs'))` — vendored libs 우선.
+3. 간단한 버전 체크(예: 지원하는 Nuke 최소버전 확인).
+4. `nuke.pluginAddPath(plugin_root)` 또는 그냥 `menu.py` import.
+
+---
+
+# 5) 요구 의존성(초기 버전 권장)
+
+* `Pillow` (이미지 처리, 클립보드 -> 파일 저장) — 대부분 환경에서 pure-wheel로 배포됨.
+* (Windows 전용, 투명도/DIB 안정성 보강 시) `pywin32` 또는 `pypiwin32` — 다만 `pywin32`는 바이너리 의존성이 있어 Nuke Python ABI와 일치하는 wheel을 준비해야 할 수 있음.
+* (선택) `pytest` 등 개발용 테스트 의존성 (배포 패키지에는 포함하지 않음).
+
+`requirements.txt` 예:
+
+```
+Pillow==9.5.0
+#pywin32==305  # Windows 전용 필요시 주석 해제 (주의: 버전/ABI 확인)
+```
+
+> 설치 스크립트는 Nuke Python으로 `pip install -r requirements.txt`를 실행하도록 합니다. (Nuke 번들 Python을 직접 명시해 호출)
+
+---
+
+# 6) 버전·호환성 관리 권장 방침
+
+* **Nuke 버전별 지원 표기**: README에 최소 지원 Nuke 버전(예: `Nuke 13.0+ (Python 3.9+)`)과 테스트된 플랫폼(Windows 10/11, macOS x) 표기. Foundry의 PySide/Qt 변화 등도 문서화 필요(예: Nuke 16의 PySide6 변화 주의). ([Erwan Leroy][8])
+* **CI에서 wheel 빌드 및 테스트**: 내부 CI(예: GitHub Actions)로 각 지원 플랫폼·Python ABI용 wheel을 빌드·수집해 `wheels/` 폴더에 보관. `ci/build_wheels.yml` 형태로 자동화 권장.
+* **업데이트 경로**: 플러그인 버전과 CHANGELOG.md를 두어 업데이트 시 사용자가 쉽게 판단하도록.
+
+---
+
+# 7) 보안·운영 상 고려사항
+
+* 클립보드에 민감 정보(예: 비밀번호, 개인정보)가 들어있을 수 있으므로 `README`/도움말에 **경고 문구** 포함(자동 업로드나 자동 저장 기능을 추후 추가할 경우 특히 중요).
+* 임시 파일 저장 위치(`tempfile.gettempdir()` 기본)와 보존 정책(자동 정리 주기) 문서화.
+
+---
+
+# 8) 테스트 계획(개발 전 체크리스트)
+
+* [ ] Nuke 버전(로컬)에서 `plugin/` 폴더 복사 → Nuke 재시작 → 메뉴항목 등장 확인.
+* [ ] Pillow로 클립보드 이미지 붙여넣기 테스트(각 캡쳐 도구: 스니핑툴, 브라우저, 그림판 등).
+* [ ] Windows: pywin32 fallback 경로 테스트(특수 DIB / 알파 케이스).
+* [ ] 배포 zip 설치 스크립트 실행(클린 윈도우 VM 권장).
+* [ ] CI: wheel 빌드 → 테스트 머신에서 설치 테스트.
+
